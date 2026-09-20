@@ -1,4 +1,5 @@
 local M = {}
+local stopped_lsp_clients = {}
 
 
 -- CORE UTILS
@@ -7,15 +8,24 @@ local M = {}
 ---Stop all LSP clients, including the ones in other tabs.
 function M.stop_lsp()
   local config = vim.g.garbage_day_config
+  local clients_to_stop = {}
+  stopped_lsp_clients = {}
+
   for _, client in pairs(vim.lsp.get_clients()) do
     local is_lsp_client_excluded =
         vim.tbl_contains(config.excluded_lsp_clients, client.name)
 
-    -- Stop lsp client
     if not is_lsp_client_excluded then
-      client.stop()
-      client.rpc.terminate()
+      if not vim.tbl_contains(stopped_lsp_clients, client.name) then
+        table.insert(stopped_lsp_clients, client.name)
+      end
+      table.insert(clients_to_stop, client)
     end
+  end
+
+  -- Stop lsp clients after their names have been saved for restart.
+  for _, client in pairs(clients_to_stop) do
+    client.stop()
   end
 end
 
@@ -39,8 +49,8 @@ function M.start_lsp()
     end
 
     -- Start LSP
-    for _, client in pairs(vim.lsp.get_clients({ bufnr = 0 })) do
-      vim.lsp.enable(client.name)
+    for _, client_name in pairs(stopped_lsp_clients) do
+      vim.lsp.enable(client_name)
     end
 
     -- Start null-ls
